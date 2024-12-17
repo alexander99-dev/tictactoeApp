@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +52,9 @@ import com.tictac.id1.R
 import kotlin.text.clear
 import androidx.compose.material.*
 import androidx.compose.material.icons.filled.*
+import androidx.compose.runtime.mutableStateListOf
+import com.google.firebase.firestore.Query
+import androidx.compose.ui.Modifier.*
 
 @Composable
 fun TicTacToe() {
@@ -165,12 +169,33 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
         }
     }
 
+    val leaderboardStats = remember { mutableStateListOf<PlayerStats>() }
+
+    LaunchedEffect(Unit) {
+        model.db.collection("playerStats")
+            .orderBy("wins", Query.Direction.DESCENDING)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                leaderboardStats.clear()
+                for (document in querySnapshot) {
+                    val stats = document.toObject(PlayerStats::class.java)
+                    leaderboardStats.add(stats)
+                }
+            }
+            .addOnFailureListener { exception ->
+                Log.e("Error", "Error fetching leaderboard: ${exception.message}")
+            }
+    }
+
+
+
+
     var playerName = "Unknown?"
     players[model.localPlayerId.value]?.let {
         playerName = it.name
     }
 
-    var showLeaderboard by remember { mutableStateOf(false) }
+    val showLeaderboard = remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -178,7 +203,7 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
                 title = { Text("TicTacToe - $playerName") },
                 actions = {
                     IconButton(onClick = {
-                        showLeaderboard = true }) {
+                        showLeaderboard.value = true }) {
                         Icon(Icons.Filled.Leaderboard, contentDescription = "Leaderboard")
                     }
                 }
@@ -186,10 +211,22 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
         }
     ) { innerPadding ->
 
-        if (showLeaderboard) {
+        if (showLeaderboard.value) {
             Dialog(
-                onDismissRequest = { showLeaderboard = false }
+                onDismissRequest = { showLeaderboard.value = false }
             ) {
+                LazyColumn {
+                    items(leaderboardStats) { stats ->
+                        LeaderboardItem(stats)
+                    }
+                }
+                Button(
+                    onClick = { showLeaderboard.value = false },
+                    modifier = Modifier
+                        .wrapContentSize(Alignment.Center)
+                ) {
+                    Text("Return")
+                }
                 // Leaderboard content (LazyColumn with player statistics)
             }
         }
@@ -260,6 +297,17 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
         }
     }
 }
+
+@Composable
+fun LeaderboardItem(stats: PlayerStats) {
+    ListItem(
+        headlineContent = { Text(stats.player.name) },
+        trailingContent = {
+            Text("Wins: ${stats.wins}, Losses: ${stats.losses}, Draws: ${stats.draws}")
+        }
+    )
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

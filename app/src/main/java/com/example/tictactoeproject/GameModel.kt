@@ -13,6 +13,13 @@ import kotlinx.coroutines.tasks.await
 data class Player(
     var name: String = ""
 )
+data class PlayerStats(
+    val playerId: String = "",
+    val player: Player,
+    val wins: Int = 0,
+    val losses: Int = 0,
+    val draws: Int = 0
+)
 
 data class Game(
     var gameBoard: List<Int> = List(9) { 0 },
@@ -29,6 +36,60 @@ class TicTacToeViewModel: ViewModel() {
     var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
+
+
+
+    fun updatePlayerStats(gameId: String) {
+        viewModelScope.launch {
+            val game = gameMap.value[gameId]
+            if (game != null) {
+                val winnerId = when (game.gameState) {
+                    "player1_won" -> game.player1Id
+                    "player2_won" -> game.player2Id
+                    else -> null // Draw or other states
+                }
+
+                val loserId = when (game.gameState) {
+                    "player1_won" -> game.player2Id
+                    "player2_won" -> game.player1Id
+                    else -> null // Draw or other states
+                }
+
+                if (winnerId != null) {
+                    incrementStat(winnerId, "wins")
+                    incrementStat(loserId!!, "losses") // Loser is not null if there's a winner
+                } else if (game.gameState == "draw") {
+                    incrementStat(game.player1Id, "draws")
+                    incrementStat(game.player2Id, "draws")
+                }
+            }
+        }
+    }
+
+    private suspend fun incrementStat(playerId: String, statName: String) {
+        try {
+            db.collection("playerStats").document(playerId)
+                .get()
+                .await()
+                .let { document ->
+                    val currentStats = document.toObject(PlayerStats::class.java)
+                        ?: PlayerStats(playerId = playerId, player = Player()) // Create with empty Player object
+                    val updatedStats = when (statName) {
+                        "wins" -> currentStats.copy(wins = currentStats.wins + 1)
+                        "losses" -> currentStats.copy(losses = currentStats.losses + 1)
+                        "draws" -> currentStats.copy(draws = currentStats.draws + 1)
+                        else -> currentStats
+                    }
+                    db.collection("playerStats").document(playerId)
+                        .set(updatedStats)
+                        .await()
+                }
+        } catch (e: Exception) {
+            Log.e("Error", "Error updating player stats: ${e.message}")
+        }
+    }
+
+
 
 
     fun loadPlayers() {
@@ -167,6 +228,11 @@ class TicTacToeViewModel: ViewModel() {
                 } else {
                     Log.e("Error", "Invalid cell index: $cell")
                 }
+
+                //after updating the game, update the player stats
+                updatePlayerStats(gameId)
+
+
             }
         }
     }
