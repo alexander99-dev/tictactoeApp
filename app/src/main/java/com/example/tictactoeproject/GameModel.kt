@@ -27,7 +27,8 @@ data class Game(
     var gameBoard: List<Int> = List(9) { 0 },
     var gameState: String = "invite",
     var player1Id: String = "",
-    var player2Id: String = ""
+    var player2Id: String = "",
+    var statsUpdated: Boolean = false
 )
 
 const val rows = 3
@@ -39,31 +40,47 @@ class TicTacToeViewModel: ViewModel() {
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
 
-
+    fun addNewPlayerStats(playerId: String, player: Player) {
+        viewModelScope.launch {
+            try {
+                val initialPlayerStats = PlayerStats(playerId = playerId, player = player, wins = 0, losses = 0, draws = 0)
+                db.collection("playerStats").document(playerId).set(initialPlayerStats).await()
+                Log.d("TicTacToeViewModel", "New PlayerStats added for playerId: $playerId")
+            } catch (e: Exception) {
+                Log.e("TicTacToeViewModel", "Error adding new PlayerStats: ${e.message}")
+            }
+        }
+    }
 
     fun updatePlayerStats(gameId: String) {
-        viewModelScope.launch {
-            val game = gameMap.value[gameId]
-            if (game != null) {
-                val winnerId = when (game.gameState) {
-                    "player1_won" -> game.player1Id
-                    "player2_won" -> game.player2Id
-                    else -> null // Draw or other states
+        viewModelScope.launch {  val game = gameMap.value[gameId]
+
+            if (game != null && !game.statsUpdated) { // Check the flag
+                when (game.gameState) {
+                    "player1_won" -> {
+                        incrementStat(game.player1Id, "wins")
+                        incrementStat(game.player2Id, "losses")
+                    }
+                    "player2_won" -> {
+                        incrementStat(game.player2Id, "wins")
+                        incrementStat(game.player1Id, "losses")
+                    }
+                    "draw" -> {
+                        incrementStat(game.player1Id, "draws")
+                        incrementStat(game.player2Id, "draws")
+                    }
                 }
 
-                val loserId = when (game.gameState) {
-                    "player1_won" -> game.player2Id
-                    "player2_won" -> game.player1Id
-                    else -> null // Draw or other states
-                }
-
-                if (winnerId != null) {
-                    incrementStat(winnerId, "wins")
-                    incrementStat(loserId!!, "losses") // Loser is not null if there's a winner
-                } else if (game.gameState == "draw") {
-                    incrementStat(game.player1Id, "draws")
-                    incrementStat(game.player2Id, "draws")
-                }
+                // Update the flag in Firebase
+                db.collection("games").document(gameId)
+                    .update("statsUpdated", true)
+                    .addOnSuccessListener {
+                        // Update the flag in the local gameMap
+                        gameMap.value = gameMap.value + (gameId to game.copy(statsUpdated = true))
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Error", "Error updating statsUpdated flag: ${e.message}")
+                    }
             }
         }
     }
@@ -123,6 +140,8 @@ class TicTacToeViewModel: ViewModel() {
                 }
             }
     }
+
+
     fun acceptGameInvite(gameId: String) {
         viewModelScope.launch {
             try {
@@ -135,6 +154,7 @@ class TicTacToeViewModel: ViewModel() {
             }
         }
     }
+
 
     fun declineGameInvite(gameId: String) {
         viewModelScope.launch {
@@ -227,20 +247,21 @@ class TicTacToeViewModel: ViewModel() {
                         .addOnFailureListener { e ->
                             Log.e("Error", "Error updating game: ${e.message}")
                         }
+
                 } else {
                     Log.e("Error", "Invalid cell index: $cell")
                 }
-
-                //after updating the game, update the player stats
-                updatePlayerStats(gameId)
-
-
             }
         }
     }
+
+
+
     fun giveUp(gameId: String) {
         viewModelScope.launch {
+
             val game = gameMap.value[gameId]
+
             if (game != null) {
                 val winner = if (game.player1Id == localPlayerId.value) {
                     "player2_won" // Player 2 wins if player 1 gives up
@@ -257,9 +278,32 @@ class TicTacToeViewModel: ViewModel() {
                     .addOnFailureListener { e ->
                         Log.e("Error", "Error updating game state after give up: ${e.message}")
                     }
+
             }
         }
     }
+
+    fun rematch(gameId: String) {
+        viewModelScope.launch {
+            try {
+                // Update game state to "player1_turn" or "invite"
+                db.collection("games").document(gameId)
+                    .update(
+                        mapOf(
+                            "gameBoard" to List(9) { 0 }, // Reset game board
+                            "gameState" to "player1_turn" // Or "invite" if you want to start with an invite
+                        )
+                    )
+                    .await()
+                Log.d("TicTacToeViewModel", "Rematch initiated for gameId: $gameId")
+            } catch (e: Exception) {
+                Log.e("TicTacToeViewModel", "Error initiating rematch: ${e.message}")
+            }
+        }
+    }
+
+
+
 }
 
 
