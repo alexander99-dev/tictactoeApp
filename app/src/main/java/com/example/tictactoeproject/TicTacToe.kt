@@ -80,11 +80,9 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
         .getSharedPreferences("TicTacToePref", Context.MODE_PRIVATE)
 
     //remove all data from shared preferences
-    /*
     val editor = sharedPreferences.edit()
     editor.clear() // Remove all data from Shared Preferences
     editor.apply()
-    */
 
 
 
@@ -133,8 +131,6 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
                                 sharedPreferences.edit().putString("playerId", newPlayerId).apply()
 
                                 model.localPlayerId.value = newPlayerId
-                                model.addNewPlayerStats(newPlayerId, newPlayer)
-
                                 // now navigating to lobby
                                 navController.navigate("lobby")
 
@@ -219,23 +215,18 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
             Dialog(
                 onDismissRequest = { showLeaderboard.value = false }
             ) {
-                Column(modifier = Modifier.padding(16.dp)) { // Add padding for better layout
-                    LazyColumn(modifier = Modifier.weight(1f)) { // Make LazyColumn take available space
-                        items(leaderboardStats) { stats ->
-                            LeaderboardItem(stats)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp)) // Add spacer for visual separation
-
-                    Button(
-                        onClick = { showLeaderboard.value = false },
-                        modifier = Modifier.fillMaxWidth() // Make button fill width
-                    ) {
-                        Text("Return")
+                LazyColumn {
+                    items(leaderboardStats) { stats ->
+                        LeaderboardItem(stats)
                     }
                 }
-
+                Button(
+                    onClick = { showLeaderboard.value = false },
+                    modifier = Modifier
+                        .wrapContentSize(Alignment.Center)
+                ) {
+                    Text("Return")
+                }
                 // Leaderboard content (LazyColumn with player statistics)
             }
         }
@@ -324,25 +315,13 @@ fun GameScreen(navController: NavController, model: TicTacToeViewModel, gameId: 
     val players by model.playerMap.collectAsStateWithLifecycle()
     val games by model.gameMap.collectAsStateWithLifecycle()
 
-    //extracts the playername from the map
     var playerName = "Unknown?"
     players[model.localPlayerId.value]?.let {
         playerName = it.name
     }
 
-
-
     if (gameId != null && games.containsKey(gameId)) {
         val game = games[gameId]!!
-
-        // Update player stats when game state changes
-        LaunchedEffect(game.gameState) {
-            if (game.gameState in listOf("player1_won", "player2_won", "draw")) {
-                model.updatePlayerStats(gameId)
-            }
-        }
-
-
         Scaffold(
             topBar = { TopAppBar(title = { Text("TicTacToe - $playerName") }) },
             containerColor = Color.LightGray
@@ -367,14 +346,7 @@ fun GameScreen(navController: NavController, model: TicTacToeViewModel, gameId: 
 
                             if (game.gameState == "draw") {
                                 Text("It's a Draw!", style = MaterialTheme.typography.headlineMedium)
-                                Button(onClick = {
-                                    // Handle rematch logic here
-                                    model.rematch(gameId) // Call rematch function in your ViewModel
-                                }) {
-                                    Text("Rematch")
-                                }
                             } else {
-
                                 val winText = if (
                                     (game.gameState == "player1_won" && game.player1Id == model.localPlayerId.value) ||
                                     (game.gameState == "player2_won" && game.player2Id == model.localPlayerId.value)
@@ -393,14 +365,10 @@ fun GameScreen(navController: NavController, model: TicTacToeViewModel, gameId: 
                         }
 
                         else -> {
-
                             val myTurn =
                                 game.gameState == "player1_turn" && game.player1Id == model.localPlayerId.value ||
                                         game.gameState == "player2_turn" && game.player2Id == model.localPlayerId.value
-
                             val turn = if (myTurn) "Your turn!" else "Wait for other player"
-
-
                             Text(turn, style = MaterialTheme.typography.headlineMedium)
                             Spacer(modifier = Modifier.padding(20.dp))
 
