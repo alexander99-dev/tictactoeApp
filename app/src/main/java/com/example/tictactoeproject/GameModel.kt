@@ -39,7 +39,17 @@ class TicTacToeViewModel: ViewModel() {
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
 
-
+    fun addNewPlayerStats(playerId: String, player: Player) {
+        viewModelScope.launch {
+            try {
+                val initialPlayerStats = PlayerStats(playerId = playerId, player = player, wins = 0, losses = 0, draws = 0)
+                db.collection("playerStats").document(playerId).set(initialPlayerStats).await()
+                Log.d("TicTacToeViewModel", "New PlayerStats added for playerId: $playerId")
+            } catch (e: Exception) {
+                Log.e("TicTacToeViewModel", "Error adding new PlayerStats: ${e.message}")
+            }
+        }
+    }
 
     fun updatePlayerStats(gameId: String) {
         viewModelScope.launch {

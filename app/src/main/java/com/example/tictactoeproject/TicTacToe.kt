@@ -80,9 +80,11 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
         .getSharedPreferences("TicTacToePref", Context.MODE_PRIVATE)
 
     //remove all data from shared preferences
+    /*
     val editor = sharedPreferences.edit()
     editor.clear() // Remove all data from Shared Preferences
     editor.apply()
+    */
 
 
 
@@ -131,6 +133,8 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
                                 sharedPreferences.edit().putString("playerId", newPlayerId).apply()
 
                                 model.localPlayerId.value = newPlayerId
+                                model.addNewPlayerStats(newPlayerId, newPlayer)
+
                                 // now navigating to lobby
                                 navController.navigate("lobby")
 
@@ -215,18 +219,23 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
             Dialog(
                 onDismissRequest = { showLeaderboard.value = false }
             ) {
-                LazyColumn {
-                    items(leaderboardStats) { stats ->
-                        LeaderboardItem(stats)
+                Column(modifier = Modifier.padding(16.dp)) { // Add padding for better layout
+                    LazyColumn(modifier = Modifier.weight(1f)) { // Make LazyColumn take available space
+                        items(leaderboardStats) { stats ->
+                            LeaderboardItem(stats)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp)) // Add spacer for visual separation
+
+                    Button(
+                        onClick = { showLeaderboard.value = false },
+                        modifier = Modifier.fillMaxWidth() // Make button fill width
+                    ) {
+                        Text("Return")
                     }
                 }
-                Button(
-                    onClick = { showLeaderboard.value = false },
-                    modifier = Modifier
-                        .wrapContentSize(Alignment.Center)
-                ) {
-                    Text("Return")
-                }
+
                 // Leaderboard content (LazyColumn with player statistics)
             }
         }
@@ -346,6 +355,11 @@ fun GameScreen(navController: NavController, model: TicTacToeViewModel, gameId: 
 
                             if (game.gameState == "draw") {
                                 Text("It's a Draw!", style = MaterialTheme.typography.headlineMedium)
+                                Button(onClick = {
+                                        navController.navigate("lobby") // goes back to lobby
+                                    }) {
+                                        Text("Back to lobby")
+                                    }
                             } else {
                                 val winText = if (
                                     (game.gameState == "player1_won" && game.player1Id == model.localPlayerId.value) ||
