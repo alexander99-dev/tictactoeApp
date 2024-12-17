@@ -19,7 +19,9 @@ data class PlayerStats(
     val wins: Int = 0,
     val losses: Int = 0,
     val draws: Int = 0
-)
+){
+    constructor() : this("", Player(), 0, 0, 0) // No-argument constructor
+}
 
 data class Game(
     var gameBoard: List<Int> = List(9) { 0 },
