@@ -131,7 +131,8 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
                                 sharedPreferences.edit().putString("playerId", newPlayerId).apply()
 
                                 model.localPlayerId.value = newPlayerId
-                                // now navigating to lobby
+                                // Call addNewPlayerStats here
+                                model.addNewPlayerStats(newPlayerId, newPlayer)
                                 navController.navigate("lobby")
 
 
@@ -346,6 +347,12 @@ fun GameScreen(navController: NavController, model: TicTacToeViewModel, gameId: 
 
                             if (game.gameState == "draw") {
                                 Text("It's a Draw!", style = MaterialTheme.typography.headlineMedium)
+                                // Rematch button for draw state
+                                Button(onClick = { model.rematch(gameId) }) {
+                                    Text("Rematch")
+                                }
+
+
                             } else {
                                 val winText = if (
                                     (game.gameState == "player1_won" && game.player1Id == model.localPlayerId.value) ||

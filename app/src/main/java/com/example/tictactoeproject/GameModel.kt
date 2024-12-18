@@ -252,6 +252,8 @@ class TicTacToeViewModel: ViewModel() {
                     Log.e("Error", "Invalid cell index: $cell")
                 }
             }
+
+            updatePlayerStats(gameId)
         }
     }
 
@@ -299,6 +301,10 @@ class TicTacToeViewModel: ViewModel() {
             } catch (e: Exception) {
                 Log.e("TicTacToeViewModel", "Error initiating rematch: ${e.message}")
             }
+
+            db.collection("games").document(gameId)
+                .update("statsUpdated", false) // Reset to false for rematch
+                .await()
         }
     }
 
