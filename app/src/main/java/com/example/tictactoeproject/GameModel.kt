@@ -9,6 +9,7 @@ import com.google.firebase.firestore.firestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlin.text.clear
 
 data class Player(
     var name: String = ""
@@ -39,6 +40,7 @@ class TicTacToeViewModel: ViewModel() {
     var localPlayerId = mutableStateOf<String?>(null)
     val playerMap = MutableStateFlow<Map<String, Player>>(emptyMap())
     val gameMap = MutableStateFlow<Map<String, Game>>(emptyMap())
+
 
     fun addNewPlayerStats(playerId: String, player: Player) {
         viewModelScope.launch {
@@ -234,6 +236,8 @@ class TicTacToeViewModel: ViewModel() {
                         turn = "draw"
                     }
 
+
+
                     db.collection("games").document(gameId)
                         .update(
                             mapOf(
@@ -243,6 +247,10 @@ class TicTacToeViewModel: ViewModel() {
                         )
                         .addOnSuccessListener {
                             gameMap.value = gameMap.value + (gameId to game.copy(gameBoard = list, gameState = turn))
+
+                            if (turn == "player1_won" || turn == "player2_won" || turn == "draw") {
+                                updatePlayerStats(gameId) // Call updatePlayerStats here
+                            }
                         }
                         .addOnFailureListener { e ->
                             Log.e("Error", "Error updating game: ${e.message}")
@@ -253,7 +261,6 @@ class TicTacToeViewModel: ViewModel() {
                 }
             }
 
-            updatePlayerStats(gameId)
         }
     }
 
@@ -276,6 +283,8 @@ class TicTacToeViewModel: ViewModel() {
                     .addOnSuccessListener {
                         // Updates gameMap
                         gameMap.value = gameMap.value + (gameId to game.copy(gameState = winner))
+
+                        updatePlayerStats(gameId)
                     }
                     .addOnFailureListener { e ->
                         Log.e("Error", "Error updating game state after give up: ${e.message}")
@@ -302,13 +311,12 @@ class TicTacToeViewModel: ViewModel() {
                 Log.e("TicTacToeViewModel", "Error initiating rematch: ${e.message}")
             }
 
+
             db.collection("games").document(gameId)
                 .update("statsUpdated", false) // Reset to false for rematch
                 .await()
         }
     }
-
-
 
 }
 

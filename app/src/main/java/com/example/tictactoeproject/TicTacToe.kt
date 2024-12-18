@@ -79,13 +79,6 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
     val sharedPreferences = LocalContext.current
         .getSharedPreferences("TicTacToePref", Context.MODE_PRIVATE)
 
-    //remove all data from shared preferences
-    val editor = sharedPreferences.edit()
-    editor.clear() // Remove all data from Shared Preferences
-    editor.apply()
-
-
-
     // Check for playerId in SharedPreferences and navigate to lobby if found
     LaunchedEffect(Unit) {
         model.localPlayerId.value = sharedPreferences.getString("playerId", null)
@@ -126,15 +119,18 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
                         model.db.collection("players")
                             .add(newPlayer)
                             .addOnSuccessListener { documentRef ->
+
                                 val newPlayerId = documentRef.id
+
                                 // store the playerId in SharedPreferences
                                 sharedPreferences.edit().putString("playerId", newPlayerId).apply()
 
                                 model.localPlayerId.value = newPlayerId
+
                                 // Call addNewPlayerStats here
                                 model.addNewPlayerStats(newPlayerId, newPlayer)
-                                navController.navigate("lobby")
 
+                                navController.navigate("lobby")
 
                             }
                             .addOnFailureListener { error ->
@@ -153,6 +149,13 @@ fun NewPlayerScreen(navController: NavController, model: TicTacToeViewModel) {
 
 }
 
+
+
+
+
+
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
@@ -170,24 +173,24 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
         }
     }
 
-    val leaderboardStats = remember { mutableStateListOf<PlayerStats>() }
+    val leaderboardStats = remember { mutableStateOf<List<PlayerStats>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         model.db.collection("playerStats")
             .orderBy("wins", Query.Direction.DESCENDING)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                leaderboardStats.clear()
-                for (document in querySnapshot) {
-                    val stats = document.toObject(PlayerStats::class.java)
-                    leaderboardStats.add(stats)
+            .addSnapshotListener { querySnapshot, exception ->
+                if (exception != null) {
+                    Log.e("Error", "Error fetching leaderboard: ${exception.message}")
+                    return@addSnapshotListener
+                }
+                if (querySnapshot != null) {
+                    val updatedStats = querySnapshot.documents.mapNotNull { document ->
+                        document.toObject(PlayerStats::class.java)
+                    }
+                    leaderboardStats.value = updatedStats
                 }
             }
-            .addOnFailureListener { exception ->
-                Log.e("Error", "Error fetching leaderboard: ${exception.message}")
-            }
     }
-
 
 
 
@@ -216,19 +219,21 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
             Dialog(
                 onDismissRequest = { showLeaderboard.value = false }
             ) {
-                LazyColumn {
-                    items(leaderboardStats) { stats ->
-                        LeaderboardItem(stats)
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(leaderboardStats.value) { stats ->
+                            LeaderboardItem(stats)
+                        }
+                    }
+                    Button(
+                        onClick = { showLeaderboard.value = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Text("Return")
                     }
                 }
-                Button(
-                    onClick = { showLeaderboard.value = false },
-                    modifier = Modifier
-                        .wrapContentSize(Alignment.Center)
-                ) {
-                    Text("Return")
-                }
-                // Leaderboard content (LazyColumn with player statistics)
             }
         }
 
@@ -299,6 +304,8 @@ fun LobbyScreen(navController: NavController, model: TicTacToeViewModel) {
     }
 }
 
+
+
 @Composable
 fun LeaderboardItem(stats: PlayerStats) {
     ListItem(
@@ -308,6 +315,10 @@ fun LeaderboardItem(stats: PlayerStats) {
         }
     )
 }
+
+
+
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
